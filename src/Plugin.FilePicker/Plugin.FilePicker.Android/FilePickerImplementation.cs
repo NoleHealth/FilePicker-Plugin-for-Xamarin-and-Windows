@@ -7,6 +7,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics;
+using Android.Support.V4.Content;
 
 namespace Plugin.FilePicker
 {
@@ -119,30 +120,52 @@ namespace Plugin.FilePicker
         {
             var uri = Android.Net.Uri.FromFile (fileToOpen);
             var intent = new Intent ();
-            var mime = IOUtil.GetMimeType (uri.ToString ());
+            var mime = IOUtil.GetMimeType (uri.ToString ().ToLower());
 
             intent.SetAction (Intent.ActionView);
+
             intent.SetDataAndType (uri, mime);
             intent.SetFlags (ActivityFlags.NewTask);
 
-            _context.StartActivity (intent);
+            if (Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.N)
+            {
+                uri = FileProvider.GetUriForFile(_context, _context.PackageName + ".fileprovider", fileToOpen);
+                intent.SetDataAndType(uri, mime);
+                intent.SetFlags(ActivityFlags.GrantReadUriPermission);
+                intent.AddFlags(ActivityFlags.NoHistory);
+            }
+            else
+            {
+                intent.SetDataAndType(uri, mime);
+                intent.SetFlags(ActivityFlags.ClearWhenTaskReset | ActivityFlags.NewTask);
+
+            }
+            try
+            {
+                Application.Context.StartActivity(Intent.CreateChooser(intent, "Select App"));
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("No application available to View this document", ex);
+                //Toast.MakeText(Application.Context, "No application available to View this document", ToastLength.Short).Show();
+            }
         }
 
-        public void OpenFile (string fileToOpen)
+        public void OpenFile(string fileToOpen)
         {
-            var myFile = new File (Android.OS.Environment.ExternalStorageState, fileToOpen);
+            var myFile = new File(Android.OS.Environment.ExternalStorageDirectory, fileToOpen);
 
-            OpenFile (myFile);
+            OpenFile(myFile);
         }
 
-        public async void OpenFile (FileData fileToOpen)
+        public async void OpenFile(FileData fileToOpen)
         {
-            var myFile = new File (Android.OS.Environment.ExternalStorageState, fileToOpen.FileName);
+            var myFile = new File(Android.OS.Environment.ExternalStorageDirectory, fileToOpen.FileName);
 
-            if (!myFile.Exists ())
-                await SaveFile (fileToOpen);
+            if (!myFile.Exists())
+                await SaveFile(fileToOpen);
 
-            OpenFile (fileToOpen);
+            OpenFile(myFile);
         }
     }
 }
